@@ -1,66 +1,76 @@
-@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
 
+/* ── Safar color tokens for Tailwind ── */
 @theme {
-  --color-safar-red:     #dc2626;
-  --color-surface:       #111111;
-  --color-surface-2:     #161616;
-  --color-border:        #1f1f1f;
-  --color-border-2:      #262626;
-  --color-muted:         #52525b;
-  --color-muted-2:       #71717a;
-  --color-subtle:        #a1a1aa;
-  --font-display:        'Space Grotesk', sans-serif;
-  --font-body:           'Inter', sans-serif;
+  --color-sr-bg:       #0a0a0a;
+  --color-sr-s1:       #111111;
+  --color-sr-s2:       #161616;
+  --color-sr-s3:       #1c1c1c;
+  --color-sr-sidebar:  #0f0f0f;
+  --color-sr-red:      #dc2626;
+  --color-sr-border:   #1f1f1f;
+  --color-sr-border2:  #2a2a2a;
+  --color-sr-white:    #ffffff;
+  --color-sr-subtle:   #a1a1aa;
+  --color-sr-muted:    #71717a;
+  --color-sr-dim:      #52525b;
+  --color-sr-green:    #22c55e;
+  --color-sr-amber:    #f59e0b;
+  --color-sr-blue:     #3b82f6;
+  --color-sr-orange:   #f97316;
+  --color-sr-purple:   #7c3aed;
+  --font-display:      'Space Grotesk', 'Inter', sans-serif;
+  --font-body:         'Inter', system-ui, sans-serif;
 }
 
+/* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
-body {
+
+html, body, #root {
+  height: 100%;
   background: #0a0a0a;
-  color: #f0f0f0;
-  font-family: 'Inter', sans-serif;
+  color: #fff;
+  font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Glass card */
-.glass {
-  background: rgba(255, 255, 255, 0.028);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
 
-/* Keyframes */
-@keyframes pulse-ring {
-  0%, 100% { opacity: 1;   transform: scale(1);   }
-  50%       { opacity: 0.3; transform: scale(1.55); }
+/* ── Keyframes ── */
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.45; transform: scale(0.8); }
 }
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(14px); }
-  to   { opacity: 1; transform: translateY(0);    }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes rail-scan {
-  from { left: -5rem; }
-  to   { left: 110%;  }
+@keyframes slideRight {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
-
-.animate-pulse-ring { animation: pulse-ring 2.2s ease-in-out infinite; }
-.animate-fade-up    { animation: fade-up 0.4s cubic-bezier(0.16,1,0.3,1) both; }
-.animate-spin       { animation: spin 0.75s linear infinite; }
-.rail-scan          { animation: rail-scan 3s linear infinite; }
-
-/* Leaflet dark popup */
-.leaflet-popup-content-wrapper,
-.leaflet-popup-tip {
-  background: #161616 !important;
-  border: 1px solid #262626 !important;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.7) !important;
-  color: #f0f0f0 !important;
-  border-radius: 12px !important;
+@keyframes redPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+  50%       { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0.12); }
 }
-.leaflet-popup-content { margin: 0 !important; }
+
+/* ── Utility animation classes ── */
+.anim-fade-up    { animation: fadeUp 0.3s ease both; }
+.anim-slide-right{ animation: slideRight 0.25s ease both; }
+.anim-spin       { animation: spin 0.85s linear infinite; }
+.pulse-dot       { animation: pulseDot 2s ease-in-out infinite; }
+
+/* ── Leaflet ── */
+.leaflet-container { height: 100%; width: 100%; }
+.leaflet-tile-pane { filter: brightness(0.75) saturate(0.65) contrast(1.1); }
+.leaflet-control-attribution,
+.leaflet-control-zoom { display: none !important; }

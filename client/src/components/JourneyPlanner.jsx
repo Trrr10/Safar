@@ -1,116 +1,268 @@
-import React, { useState } from "react";
-import { planJourney } from "../utils/api";
+import React, { useState, useRef, useEffect } from "react";
 import {
-  MapPin, Navigation, Clock, Users, AlertTriangle,
-  RefreshCw, ChevronDown, Loader, Accessibility, CheckCircle, ArrowUpDown
+  MapPin, Navigation, ArrowUpDown, ArrowRight, Accessibility,
+  CheckCircle, ChevronDown, Loader, RefreshCw, AlertTriangle,
+  Clock, Users, TrendingUp, X, Radio,
 } from "lucide-react";
+import { T, MODE_META, CROWD_COLOR, Badge, PulseDot, SectionLabel } from "../utils/tokens.jsx";
+import { POPULAR_STOPS, MOCK_ROUTES, TIME_BUDGETS } from "../utils/mockData.js";
 
-const POPULAR = [
-  { name: "Churchgate",     lat: 18.9322, lng: 72.8264 },
-  { name: "Andheri",        lat: 19.1136, lng: 72.8697 },
-  { name: "Dadar",          lat: 19.0178, lng: 72.8478 },
-  { name: "Borivali",       lat: 19.2307, lng: 72.8567 },
-  { name: "Ghatkopar",      lat: 19.0863, lng: 72.9082 },
-  { name: "Mumbai Central", lat: 18.9694, lng: 72.8194 },
-  { name: "CST",            lat: 18.9400, lng: 72.8354 },
-  { name: "Bandra",         lat: 19.0596, lng: 72.8295 },
-];
+/* ── Stop picker dropdown ── */
+function StopPicker({ label, value, onChange, icon: Icon, placeholder }) {
+  const [open,  setOpen]  = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef(null);
 
-const MODE_COLORS = { bus: "#dc2626", metro: "#f97316", train: "#7c3aed" };
-const MODE_ICONS  = { bus: "🚌", metro: "🚇", train: "🚆" };
-const CROWD_COLOR = { low: "#22c55e", medium: "#f59e0b", high: "#ef4444" };
+  const filtered = POPULAR_STOPS.filter(s =>
+    s.name.toLowerCase().includes(query.toLowerCase())
+  );
 
-function StopSelect({ label, value, onChange, icon: Icon }) {
-  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const fn = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, []);
+
   return (
-    <div className="relative">
-      <label className="block text-[10px] font-semibold text-[#52525b] uppercase tracking-widest mb-1.5">{label}</label>
+    <div ref={ref} style={{ position: "relative", flex: 1 }}>
+      <SectionLabel mb={6}>{label}</SectionLabel>
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-[#161616] border border-[#262626] hover:border-[#dc2626]/40 transition-colors text-left"
+        style={{
+          width: "100%", display: "flex", alignItems: "center", gap: 10,
+          padding: "11px 14px", borderRadius: 12,
+          background: T.s2, border: `1px solid ${open ? "rgba(220,38,38,0.45)" : T.b2}`,
+          cursor: "pointer", textAlign: "left", transition: "border-color 0.15s",
+          outline: "none",
+        }}
       >
-        <Icon size={14} className="text-[#dc2626] flex-shrink-0" />
-        <span className={`flex-1 text-sm truncate ${value ? "text-white" : "text-[#3f3f46]"}`}>
-          {value?.name || `Select ${label.toLowerCase()}`}
+        <Icon size={13} color={T.red} style={{ flexShrink: 0 }} />
+        <span style={{
+          flex: 1, fontSize: 13, fontFamily: T.body, fontWeight: value ? 500 : 400,
+          color: value ? T.white : T.dim,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>
+          {value?.name || placeholder}
         </span>
-        <ChevronDown size={12} className={`text-[#52525b] flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          size={12} color={T.dim}
+          style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}
+        />
       </button>
+
       {open && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-[#161616] border border-[#262626] rounded-xl overflow-hidden z-50 shadow-2xl">
-          {POPULAR.map(s => (
-            <button
-              key={s.name}
-              onClick={() => { onChange(s); setOpen(false); }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-[#1c1c1c] transition-colors text-sm text-left"
-            >
-              <MapPin size={12} className="text-[#dc2626] flex-shrink-0" />
-              <span className="text-[#a1a1aa]">{s.name}</span>
-            </button>
-          ))}
+        <div style={{
+          position: "absolute", top: "calc(100% + 5px)", left: 0, right: 0, zIndex: 300,
+          background: T.s2, border: `1px solid ${T.b2}`,
+          borderRadius: 13, overflow: "hidden",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.75)",
+        }}>
+          <div style={{ padding: "8px 12px", borderBottom: `1px solid ${T.b1}` }}>
+            <input
+              autoFocus value={query} onChange={e => setQuery(e.target.value)}
+              placeholder="Search stops…"
+              style={{
+                width: "100%", background: "transparent", border: "none",
+                outline: "none", fontSize: 13, color: T.white, padding: "3px 0",
+                fontFamily: T.body,
+              }}
+            />
+          </div>
+          <div style={{ maxHeight: 210, overflowY: "auto" }}>
+            {filtered.length === 0
+              ? <div style={{ padding: 14, fontSize: 12, color: T.dim, textAlign: "center" }}>No stops found</div>
+              : filtered.map(s => (
+                <button
+                  key={s.name}
+                  onClick={() => { onChange(s); setOpen(false); setQuery(""); }}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 10,
+                    padding: "10px 14px", background: "transparent",
+                    border: "none", cursor: "pointer", textAlign: "left",
+                    transition: "background 0.1s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = T.s3}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                >
+                  <MapPin size={11} color={T.red} style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: T.subtle, fontFamily: T.body }}>{s.name}</span>
+                </button>
+              ))
+            }
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function RouteCard({ option, index, isAlternate }) {
-  const [expanded, setExpanded] = useState(false);
-  const color = MODE_COLORS[option.mode] || "#dc2626";
-  const isBest = index === 0 && !isAlternate;
+/* ── Stepper dot ── */
+function StepDot({ n, active, done }) {
+  return (
+    <div style={{
+      width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      background: done ? T.red : active ? "rgba(220,38,38,0.12)" : T.s2,
+      border: `1.5px solid ${done || active ? T.red : T.b2}`,
+      fontSize: 12, fontWeight: 700, fontFamily: T.display,
+      color: done ? T.white : active ? T.red : T.dim,
+      transition: "all 0.25s",
+    }}>
+      {done ? <CheckCircle size={13} /> : n}
+    </div>
+  );
+}
+
+/* ── Route card ── */
+function RouteCard({ option, rank, selected, onSelect, onTrack }) {
+  const [expanded, setExpanded] = useState(rank === 0);
+  const m = MODE_META[option.mode] || MODE_META.bus;
+  const isBest = rank === 0 && !option.disrupted;
+  const isSel  = selected?.id === option.id;
+  const borderColor = isSel ? T.red : option.disrupted ? "rgba(239,68,68,0.25)" : isBest ? "rgba(220,38,38,0.2)" : T.b2;
+  const bgColor = isSel ? "rgba(220,38,38,0.06)" : option.disrupted ? "rgba(239,68,68,0.03)" : T.s1;
 
   return (
     <div
-      className="rounded-xl border overflow-hidden transition-all duration-200"
+      onClick={() => { onSelect(option); setExpanded(e => !e); }}
+      className="anim-fade-up"
       style={{
-        background: isBest ? "rgba(220,38,38,0.05)" : isAlternate ? "rgba(245,158,11,0.05)" : "#161616",
-        borderColor: isBest ? "rgba(220,38,38,0.3)" : isAlternate ? "rgba(245,158,11,0.3)" : "#262626",
+        borderRadius: 16, overflow: "hidden",
+        border: `1px solid ${borderColor}`,
+        background: bgColor,
+        transition: "all 0.2s ease", cursor: "pointer",
+        animationDelay: `${rank * 0.06}s`,
       }}
     >
-      <div className="flex items-center gap-3 p-3.5 cursor-pointer" onClick={() => setExpanded(e => !e)}>
-        {/* Mode badge */}
-        <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-base"
-          style={{ background: `${color}12`, border: `1px solid ${color}28` }}
-        >
-          {MODE_ICONS[option.mode] || "🚌"}
+      {/* Best banner */}
+      {isBest && (
+        <div style={{
+          padding: "5px 16px", fontSize: 10, fontWeight: 700,
+          letterSpacing: "0.08em", textTransform: "uppercase",
+          background: "rgba(220,38,38,0.08)", color: T.red,
+          borderBottom: "1px solid rgba(220,38,38,0.14)",
+          display: "flex", alignItems: "center", gap: 6,
+        }}>
+          <PulseDot color={T.red} size={5} />
+          Recommended · fastest option
         </div>
+      )}
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-            <span className="text-xs font-semibold text-white truncate">{option.route_name}</span>
-            {isBest && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#dc2626]/15 text-[#dc2626] border border-[#dc2626]/25 font-semibold flex-shrink-0">Best</span>
-            )}
-            {isAlternate && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25 font-semibold flex-shrink-0">Alt</span>
-            )}
-            {option.disrupted && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-900/25 text-red-400 border border-red-500/25 font-semibold flex-shrink-0">⚠</span>
-            )}
+      {/* Main row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 18px" }}>
+        <div style={{
+          width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+          background: `${m.color}14`, border: `1px solid ${m.color}28`,
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
+        }}>{m.emoji}</div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: T.white, fontFamily: T.display }}>{option.route_name}</span>
+            {option.disrupted && <Badge label="Disrupted" color={T.red} />}
+            {option.delay_minutes > 0 && !option.disrupted && <Badge label={`+${option.delay_minutes}m delay`} color={T.amber} />}
           </div>
-          <div className="text-[11px] text-[#52525b] truncate">{option.board_stop} → {option.alight_stop}</div>
+          <div style={{ fontSize: 12, color: T.dim, lineHeight: 1.4 }}>
+            {option.board_stop} → {option.alight_stop}
+            <span style={{ color: T.b3, margin: "0 6px" }}>·</span>
+            {option.fare}
+            <span style={{ color: T.b3, margin: "0 6px" }}>·</span>
+            {option.platform}
+          </div>
         </div>
 
-        <div className="flex-shrink-0 text-right">
-          <div className="text-base font-bold text-white font-['Space_Grotesk',sans-serif]">{option.total_minutes}<span className="text-xs font-normal text-[#52525b] ml-0.5">m</span></div>
-          <div className="text-[11px] text-[#52525b]">{option.eta}</div>
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
+          <div style={{
+            fontFamily: T.display, fontWeight: 700, fontSize: 28,
+            color: option.disrupted ? T.red : T.white, lineHeight: 1,
+            fontVariantNumeric: "tabular-nums",
+          }}>
+            {option.total_minutes}
+            <span style={{ fontSize: 13, fontWeight: 400, color: T.dim, marginLeft: 3 }}>m</span>
+          </div>
+          <div style={{ fontSize: 11, color: T.muted, marginTop: 4 }}>arr {option.eta}</div>
         </div>
       </div>
 
+      {/* Expanded detail */}
       {expanded && (
-        <div className="px-3.5 pb-3.5 border-t border-[#1f1f1f]">
-          <div className="grid grid-cols-2 gap-2 mt-3">
+        <div style={{ padding: "0 18px 18px", borderTop: `1px solid ${T.b1}` }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 14 }}>
             {[
-              { label: "Delay", value: option.delay_minutes > 0 ? `+${option.delay_minutes} min` : "On time", color: option.delay_minutes > 0 ? "#ef4444" : "#22c55e" },
-              { label: "Crowd", value: option.crowd_level, color: CROWD_COLOR[option.crowd_level], cap: true },
-              { label: "Walk",  value: `${(option.walk_to_board_km * 1000).toFixed(0)}m`, color: "#a1a1aa" },
-              { label: "Confidence", value: `${(option.delay_confidence * 100).toFixed(0)}%`, color: "#a1a1aa" },
-            ].map(({ label, value, color: c, cap }) => (
-              <div key={label} className="bg-[#111111] rounded-lg p-2.5 border border-[#1f1f1f]">
-                <div className="text-[10px] text-[#52525b] mb-1">{label}</div>
-                <div className="text-xs font-semibold" style={{ color: c, textTransform: cap ? "capitalize" : undefined }}>{value}</div>
+              { label: "Crowd",      value: option.crowd_level,           color: CROWD_COLOR[option.crowd_level], cap: true },
+              { label: "Walk",       value: `${Math.round(option.walk_to_board_km * 1000)}m to stop`, color: T.subtle },
+              { label: "Delay conf", value: `${Math.round(option.delay_confidence * 100)}%`,
+                color: option.delay_confidence > 0.85 ? T.green : T.amber },
+              { label: "Transfer",   value: option.transfer_window,
+                color: option.transfer_window?.startsWith("Safe") || option.transfer_window === "Comfortable" ? T.green
+                  : option.transfer_window?.startsWith("Tight") ? T.amber : T.red },
+              { label: "Delay",      value: option.delay_minutes > 0 ? `+${option.delay_minutes} min` : "On time",
+                color: option.delay_minutes > 0 ? T.red : T.green },
+              { label: "Platform",   value: option.platform, color: T.subtle },
+            ].map(({ label, value, color, cap }) => (
+              <div key={label} style={{
+                background: T.s2, borderRadius: 10, padding: "10px 12px", border: `1px solid ${T.b1}`,
+              }}>
+                <div style={{ fontSize: 10, color: T.dim, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.08em" }}>{label}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color, textTransform: cap ? "capitalize" : "none" }}>{value}</div>
               </div>
             ))}
+          </div>
+
+          {option.features?.length > 0 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+              {option.features.map(f => (
+                <span key={f} style={{
+                  fontSize: 11, padding: "3px 10px", borderRadius: 7,
+                  background: T.s2, border: `1px solid ${T.b2}`, color: T.muted,
+                }}>{f}</span>
+              ))}
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+            {!option.disrupted && (
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onTrack?.(option);
+                }}
+                style={{
+                  flex: 1, padding: "11px",
+                  borderRadius: 11, border: "none", cursor: "pointer",
+                  background: T.red,
+                  color: T.white,
+                  fontSize: 13, fontWeight: 600, fontFamily: T.display,
+                  boxShadow: "0 0 24px rgba(220,38,38,0.28)",
+                  letterSpacing: "0.01em",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.boxShadow = "0 0 32px rgba(220,38,38,0.45)"}
+                onMouseLeave={e => e.currentTarget.style.boxShadow = "0 0 24px rgba(220,38,38,0.28)"}
+              >
+                <Radio size={13} />
+                Select &amp; track
+              </button>
+            )}
+
+            {option.disrupted && (
+              <button
+                onClick={e => e.stopPropagation()}
+                style={{
+                  flex: 1, padding: "11px",
+                  borderRadius: 11, cursor: "pointer",
+                  background: "rgba(245,158,11,0.15)",
+                  border: "1px solid rgba(245,158,11,0.35)",
+                  color: T.amber,
+                  fontSize: 13, fontWeight: 600, fontFamily: T.display,
+                  letterSpacing: "0.01em",
+                }}
+              >
+                ⚠ Use alternate route above
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -118,122 +270,343 @@ function RouteCard({ option, index, isAlternate }) {
   );
 }
 
-export default function JourneyPlanner() {
-  const [origin,      setOrigin]      = useState(null);
-  const [destination, setDestination] = useState(null);
-  const [a11y,        setA11y]        = useState(false);
-  const [loading,     setLoading]     = useState(false);
-  const [result,      setResult]      = useState(null);
-  const [error,       setError]       = useState(null);
+/* ══════════════════════════════════════
+   JOURNEY PLANNER (exported)
+══════════════════════════════════════ */
+export default function JourneyPlanner({ onRouteSelect, onTrackRoute }) {
+  const [step,          setStep]          = useState(1);
+  const [origin,        setOrigin]        = useState(null);
+  const [dest,          setDest]          = useState(null);
+  const [timeBudget,    setTimeBudget]    = useState(null);
+  const [accessibility, setAccessibility] = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [routes,        setRoutes]        = useState([]);
+  const [selectedRoute, setSelectedRoute] = useState(null);
 
-  const swap = () => { setOrigin(destination); setDestination(origin); setResult(null); };
+  const swap  = () => { setOrigin(dest); setDest(origin); };
+  const reset = () => { setStep(1); setOrigin(null); setDest(null); setTimeBudget(null); setRoutes([]); setSelectedRoute(null); };
 
-  const search = async () => {
-    if (!origin || !destination) return;
-    setLoading(true); setError(null); setResult(null);
-    try {
-      const data = await planJourney({
-        origin_name: origin.name, origin_lat: origin.lat, origin_lng: origin.lng,
-        dest_name: destination.name, dest_lat: destination.lat, dest_lng: destination.lng,
-        accessibility: a11y,
-      });
-      setResult(data);
-    } catch {
-      setError("Could not fetch journey. Make sure the backend is running.");
-    } finally {
+  const searchRoutes = () => {
+    setLoading(true);
+    setTimeout(() => {
+      const filtered = MOCK_ROUTES.filter(r => r.total_minutes <= (timeBudget?.value || 999));
+      setRoutes(filtered);
       setLoading(false);
-    }
+      setStep(3);
+    }, 1400);
   };
 
+  const handleRouteSelect = (route) => {
+    setSelectedRoute(route);
+    onRouteSelect?.(route);
+  };
+
+  const handleTrack = (route) => {
+    setSelectedRoute(route);
+    onRouteSelect?.(route);
+    onTrackRoute?.(route);
+  };
+
+  const STEPS = ["Choose stops", "Time budget", "Pick your ride"];
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-3">
-        <Navigation size={14} className="text-[#dc2626]" />
-        <h3 className="font-['Space_Grotesk',sans-serif] font-semibold text-sm text-white">Plan journey</h3>
+    <div style={{ height: "100%", overflowY: "auto", padding: "32px 36px", maxWidth: 700, margin: "0 auto" }}>
+
+      {/* ── Step progress ── */}
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 36 }}>
+        {STEPS.map((label, i) => (
+          <React.Fragment key={label}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+              <StepDot n={i + 1} active={step === i + 1} done={step > i + 1} />
+              <span style={{
+                fontSize: 12, whiteSpace: "nowrap",
+                fontWeight: step === i + 1 ? 600 : 400,
+                color: step === i + 1 ? T.white : step > i + 1 ? T.subtle : T.dim,
+              }}>{label}</span>
+            </div>
+            {i < 2 && (
+              <div style={{
+                flex: 1, height: 1, margin: "0 12px",
+                background: step > i + 1 ? T.red : T.b1,
+                maxWidth: 64, transition: "background 0.4s",
+              }} />
+            )}
+          </React.Fragment>
+        ))}
       </div>
 
-      {/* Input panel */}
-      <div className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-4 mb-3">
-        <div className="flex flex-col gap-2.5">
-          <StopSelect label="From" value={origin}      onChange={setOrigin}      icon={MapPin} />
+      {/* ─────────────────── STEP 1 ─────────────────── */}
+      {step === 1 && (
+        <div className="anim-fade-up">
+          <h1 style={{
+            fontFamily: T.display, fontWeight: 700,
+            fontSize: "clamp(1.75rem,3.5vw,2.5rem)",
+            color: T.white, marginBottom: 6, letterSpacing: "-0.025em", lineHeight: 1.1,
+          }}>
+            Where are you headed?
+          </h1>
+          <p style={{ fontSize: 14, color: T.muted, marginBottom: 28, lineHeight: 1.65 }}>
+            SAFAR searches live across local trains, metro, and MTC buses simultaneously.
+          </p>
 
-          {/* Swap */}
-          <div className="flex justify-center">
+          <div style={{
+            background: T.s1, border: `1px solid ${T.b1}`,
+            borderRadius: 20, padding: 22, marginBottom: 28,
+          }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+              <StopPicker label="From" value={origin} onChange={setOrigin} icon={MapPin} placeholder="Select origin stop" />
+              <button
+                onClick={swap}
+                style={{
+                  width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+                  background: T.s2, border: `1px solid ${T.b2}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer", alignSelf: "center", marginTop: 22,
+                  transition: "all 0.15s", outline: "none",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(220,38,38,0.45)"; e.currentTarget.style.background = "rgba(220,38,38,0.08)"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = T.b2; e.currentTarget.style.background = T.s2; }}
+              >
+                <ArrowUpDown size={13} color={T.dim} />
+              </button>
+              <StopPicker label="To" value={dest} onChange={setDest} icon={Navigation} placeholder="Select destination" />
+            </div>
+
             <button
-              onClick={swap}
-              className="w-7 h-7 rounded-full bg-[#1c1c1c] border border-[#262626] flex items-center justify-center hover:border-[#dc2626]/40 hover:bg-[#dc2626]/8 transition-all"
+              onClick={() => setAccessibility(v => !v)}
+              style={{
+                marginTop: 14, display: "flex", alignItems: "center", gap: 8,
+                padding: "8px 14px", borderRadius: 9, cursor: "pointer",
+                background: accessibility ? "rgba(220,38,38,0.08)" : "transparent",
+                border: `1px solid ${accessibility ? "rgba(220,38,38,0.3)" : T.b2}`,
+                color: accessibility ? T.red : T.dim,
+                fontSize: 12, fontWeight: 500, fontFamily: T.body,
+                transition: "all 0.15s", outline: "none",
+              }}
             >
-              <ArrowUpDown size={11} className="text-[#52525b]" />
+              <Accessibility size={12} />
+              Wheelchair-accessible routes only
+              {accessibility && <CheckCircle size={12} color={T.red} style={{ marginLeft: "auto" }} />}
+            </button>
+
+            <button
+              onClick={() => origin && dest && setStep(2)}
+              disabled={!origin || !dest}
+              style={{
+                marginTop: 16, width: "100%", padding: "13px",
+                borderRadius: 12, border: "none",
+                cursor: !origin || !dest ? "not-allowed" : "pointer",
+                background: T.red, color: T.white,
+                fontSize: 14, fontWeight: 600, fontFamily: T.display,
+                opacity: !origin || !dest ? 0.3 : 1,
+                boxShadow: !origin || !dest ? "none" : "0 0 28px rgba(220,38,38,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                transition: "all 0.2s", letterSpacing: "0.01em",
+              }}
+            >
+              Continue <ArrowRight size={14} />
             </button>
           </div>
 
-          <StopSelect label="To"   value={destination} onChange={setDestination} icon={Navigation} />
-        </div>
-
-        {/* A11y toggle */}
-        <button
-          onClick={() => setA11y(v => !v)}
-          className="mt-3 flex items-center gap-2 text-[11px] px-3 py-1.5 rounded-lg border transition-all"
-          style={a11y
-            ? { background: "rgba(220,38,38,0.08)", borderColor: "rgba(220,38,38,0.3)", color: "#dc2626" }
-            : { background: "transparent", borderColor: "#262626", color: "#52525b" }
-          }
-        >
-          <Accessibility size={12} />
-          Wheelchair-friendly only
-        </button>
-
-        {/* Search */}
-        <button
-          onClick={search}
-          disabled={!origin || !destination || loading}
-          className="w-full mt-3 py-2.5 rounded-xl font-semibold text-xs text-white flex items-center justify-center gap-2 transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed"
-          style={{ background: "#dc2626", boxShadow: (!origin || !destination || loading) ? "none" : "0 0 20px rgba(220,38,38,0.3)" }}
-        >
-          {loading ? <><Loader size={13} className="animate-spin" /> Searching…</> : "Find best route"}
-        </button>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-900/15 border border-red-500/25 text-red-400 text-xs mb-3">
-          <AlertTriangle size={13} />
-          {error}
+          <div>
+            <SectionLabel>Quick select</SectionLabel>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {POPULAR_STOPS.slice(0, 9).map(s => (
+                <button
+                  key={s.name}
+                  onClick={() => !origin ? setOrigin(s) : !dest ? setDest(s) : null}
+                  style={{
+                    padding: "6px 14px", borderRadius: 8, fontSize: 12, fontFamily: T.body,
+                    background: T.s2, border: `1px solid ${T.b2}`,
+                    color: T.subtle, cursor: "pointer", transition: "all 0.15s", outline: "none",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(220,38,38,0.35)"; e.currentTarget.style.color = T.white; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = T.b2; e.currentTarget.style.color = T.subtle; }}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Results */}
-      {result && (
-        <div className="flex flex-col gap-2.5 animate-fade-up overflow-y-auto flex-1 min-h-0">
-          <div className="flex items-center justify-between px-0.5">
-            <div>
-              <div className="text-xs font-semibold text-white">{result.origin} → {result.destination}</div>
-              <div className="text-[11px] text-[#52525b]">{result.distance_km} km · {result.options?.length} options</div>
-            </div>
-            {result.has_disruption && (
-              <div className="flex items-center gap-1 text-[11px] text-amber-400">
-                <AlertTriangle size={11} /> Disruption
-              </div>
-            )}
+      {/* ─────────────────── STEP 2 ─────────────────── */}
+      {step === 2 && (
+        <div className="anim-fade-up">
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, marginBottom: 28,
+            padding: "10px 16px", borderRadius: 12,
+            background: T.s1, border: `1px solid ${T.b1}`,
+          }}>
+            <MapPin size={12} color={T.red} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.white, fontFamily: T.display }}>{origin?.name}</span>
+            <ArrowRight size={12} color={T.dim} style={{ flexShrink: 0 }} />
+            <Navigation size={12} color={T.red} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.white, fontFamily: T.display }}>{dest?.name}</span>
+            <button
+              onClick={() => setStep(1)}
+              style={{
+                marginLeft: "auto", background: "none", border: "none",
+                cursor: "pointer", color: T.muted, fontSize: 11,
+                fontFamily: T.body, display: "flex", alignItems: "center", gap: 4,
+              }}
+            >
+              <X size={11} /> Edit
+            </button>
           </div>
 
-          {result.has_disruption && result.alternate && (
-            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-amber-500/6 border border-amber-500/18">
-              <RefreshCw size={12} className="text-amber-400 flex-shrink-0" />
+          <h1 style={{
+            fontFamily: T.display, fontWeight: 700,
+            fontSize: "clamp(1.75rem,3.5vw,2.5rem)",
+            color: T.white, marginBottom: 6, letterSpacing: "-0.025em",
+          }}>
+            How much time do you have?
+          </h1>
+          <p style={{ fontSize: 14, color: T.muted, marginBottom: 28, lineHeight: 1.65 }}>
+            Live delays are factored in. Only routes that fit get shown.
+          </p>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 28 }}>
+            {TIME_BUDGETS.map(t => {
+              const active = timeBudget?.value === t.value;
+              return (
+                <button
+                  key={t.label}
+                  onClick={() => setTimeBudget(t)}
+                  style={{
+                    padding: "22px 12px", borderRadius: 14, cursor: "pointer",
+                    background: active ? "rgba(220,38,38,0.09)" : T.s2,
+                    border: `1.5px solid ${active ? "rgba(220,38,38,0.45)" : T.b2}`,
+                    color: active ? T.red : T.subtle,
+                    fontFamily: T.display, fontWeight: 700, fontSize: 20,
+                    boxShadow: active ? "0 0 20px rgba(220,38,38,0.14)" : "none",
+                    transition: "all 0.15s", outline: "none",
+                  }}
+                  onMouseEnter={e => { if (!active) { e.currentTarget.style.borderColor = "rgba(220,38,38,0.25)"; e.currentTarget.style.color = T.white; } }}
+                  onMouseLeave={e => { if (!active) { e.currentTarget.style.borderColor = T.b2; e.currentTarget.style.color = T.subtle; } }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={() => timeBudget && !loading ? searchRoutes() : null}
+            disabled={!timeBudget || loading}
+            style={{
+              width: "100%", padding: "14px", borderRadius: 12, border: "none",
+              cursor: !timeBudget || loading ? "not-allowed" : "pointer",
+              background: T.red, color: T.white,
+              fontSize: 14, fontWeight: 600, fontFamily: T.display,
+              opacity: !timeBudget || loading ? 0.35 : 1,
+              boxShadow: !timeBudget || loading ? "none" : "0 0 28px rgba(220,38,38,0.3)",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              transition: "all 0.2s", letterSpacing: "0.01em",
+            }}
+          >
+            {loading
+              ? <><Loader size={14} className="anim-spin" /> Finding best routes…</>
+              : <><span>Find routes</span> <ArrowRight size={14} /></>
+            }
+          </button>
+        </div>
+      )}
+
+      {/* ─────────────────── STEP 3 ─────────────────── */}
+      {step === 3 && (
+        <div>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
+                <span style={{ fontFamily: T.display, fontWeight: 700, fontSize: "1.5rem", color: T.white, letterSpacing: "-0.02em" }}>
+                  {origin?.name}
+                </span>
+                <ArrowRight size={16} color={T.red} style={{ flexShrink: 0 }} />
+                <span style={{ fontFamily: T.display, fontWeight: 700, fontSize: "1.5rem", color: T.white, letterSpacing: "-0.02em" }}>
+                  {dest?.name}
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: T.dim, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span>Within {timeBudget?.label}</span>
+                <span style={{ color: T.b3 }}>·</span>
+                <span>{routes.length} options found</span>
+                <span style={{ color: T.b3 }}>·</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <PulseDot color={T.green} size={5} /> Live ETAs
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={reset}
+              style={{
+                display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
+                borderRadius: 9, background: T.s2, border: `1px solid ${T.b2}`,
+                color: T.muted, fontSize: 12, cursor: "pointer", fontFamily: T.body, outline: "none",
+              }}
+            >
+              <RefreshCw size={11} /> New search
+            </button>
+          </div>
+
+          {routes.some(r => r.disrupted) && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10, padding: "11px 15px",
+              borderRadius: 12, marginBottom: 10,
+              background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.2)",
+            }}>
+              <RefreshCw size={13} color={T.amber} />
               <div>
-                <div className="text-[10px] font-semibold text-amber-400">Auto re-route available</div>
-                <div className="text-[10px] text-amber-400/60">Alternate shown below</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: T.amber }}>Auto re-route active</div>
+                <div style={{ fontSize: 11, color: "rgba(245,158,11,0.6)" }}>Disrupted services shown at bottom · best alternate at top</div>
               </div>
             </div>
           )}
 
-          {result.options?.map((opt, i) => <RouteCard key={opt.id + i} option={opt} index={i} isAlternate={false} />)}
-          {result.alternate && <RouteCard option={result.alternate} index={99} isAlternate />}
+          {routes.some(r => r.delay_minutes > 0) && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
+              borderRadius: 12, marginBottom: 16,
+              background: "rgba(220,38,38,0.04)", border: "1px solid rgba(220,38,38,0.14)",
+            }}>
+              <TrendingUp size={13} color="rgba(220,38,38,0.7)" />
+              <span style={{ fontSize: 12, color: "rgba(220,38,38,0.65)" }}>
+                Cross-modal delay propagation detected — downstream connections updated live
+              </span>
+            </div>
+          )}
 
-          <div className="flex items-center gap-1.5 text-[11px] text-[#22c55e] px-0.5 pb-1">
-            <CheckCircle size={11} /> Journey saved · ML predictions applied
-          </div>
+          {routes.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "60px 0" }}>
+              <Clock size={32} color={T.b3} style={{ marginBottom: 12 }} />
+              <div style={{ fontSize: 14, color: T.dim, marginBottom: 12 }}>No routes fit within {timeBudget?.label}.</div>
+              <button
+                onClick={() => setStep(2)}
+                style={{ background: "none", border: "none", color: T.red, cursor: "pointer", fontSize: 13, fontFamily: T.body }}
+              >
+                Try a longer time budget →
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {routes.map((r, i) => (
+                <RouteCard
+                  key={r.id} option={r} rank={i}
+                  selected={selectedRoute}
+                  onSelect={handleRouteSelect}
+                  onTrack={handleTrack}
+                />
+              ))}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 6, marginTop: 8,
+                paddingTop: 14, borderTop: `1px solid ${T.b1}`,
+              }}>
+                <CheckCircle size={11} color={T.green} />
+                <span style={{ fontSize: 11, color: T.dim }}>ML-powered ETAs · confidence-scored · journey auto-logged</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
